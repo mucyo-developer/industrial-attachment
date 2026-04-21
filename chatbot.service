@@ -1,0 +1,34 @@
+[Unit]
+Description=AI Chatbot Service
+After=network.target
+
+[Service]
+Type=exec
+User=chatbot
+Group=chatbot
+WorkingDirectory=/opt/chatbot
+Environment=PATH=/opt/chatbot/venv/bin
+Environment=FLASK_ENV=production
+EnvironmentFile=/opt/chatbot/.env
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/chatbot/logs /opt/chatbot/data
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ai-chatbot
+
+# Main command
+ExecStart=/opt/chatbot/venv/bin/gunicorn --bind 0.0.0.0:5000 --workers 2 --timeout 60 production_chatbot:app
+
+[Install]
+WantedBy=multi-user.target
