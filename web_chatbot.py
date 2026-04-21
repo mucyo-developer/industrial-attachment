@@ -86,6 +86,7 @@ Examples:
 - "Create a folder called my-project" -> {{"operation": "create_folder", "folder_name": "my-project", "folder_path": ""}}
 - "Create a folder called data in C:\\Users\\Student\\Documents" -> {{"operation": "create_folder", "folder_name": "data", "folder_path": "C:\\Users\\Student\\Documents"}}
 - "Create a folder called projects on my Desktop" -> {{"operation": "create_folder", "folder_name": "projects", "folder_path": "Desktop"}}
+- "Create a folder called temp on Desktop" -> {{"operation": "create_folder", "folder_name": "temp", "folder_path": "Desktop"}}
 - "Create a file called app.py with hello world code" -> {{"operation": "create_file", "file_name": "app.py", "file_content": "hello world code"}}
 - "Initialize a Python virtual environment called venv" -> {{"operation": "create_venv", "venv_name": "venv", "venv_path": ""}}
 - "Create a React project called my-app" -> {{"operation": "create_project", "project_type": "react", "project_name": "my-app", "project_path": ""}}
@@ -100,6 +101,8 @@ Rules:
 - Handle Windows paths (C:\\folder) and Unix paths (/home/user/folder)
 - Handle relative paths (Desktop, Documents, Downloads)
 - If path is not specified, use current directory
+- IMPORTANT: If user mentions "create folder", "new folder", "make folder", or similar, ALWAYS return create_folder operation
+- Do NOT provide instructions on how to create folders manually - extract the folder creation intent
 
 Respond with JSON only:
 """
@@ -115,6 +118,24 @@ Respond with JSON only:
         except json.JSONDecodeError:
             pass
         
+        # Fallback: Check for folder creation keywords manually
+        folder_keywords = ['create folder', 'new folder', 'make folder', 'create a folder', 'make a folder', 'add folder']
+        user_lower = user_input.lower()
+        
+        for keyword in folder_keywords:
+            if keyword in user_lower:
+                # Try to extract folder name using regex
+                folder_match = re.search(r'(?:folder|directory)\s+(?:called|named)\s+["\']?([^"\']+)["\']?', user_lower, re.IGNORECASE)
+                if folder_match:
+                    folder_name = folder_match.group(1).strip()
+                    # Check for location
+                    location_match = re.search(r'(?:in|on|at)\s+(?:the\s+)?(desktop|documents|downloads|c:\\[^\\]+)', user_lower, re.IGNORECASE)
+                    folder_path = location_match.group(1) if location_match else ""
+                    return {"operation": "create_folder", "folder_name": folder_name, "folder_path": folder_path}
+                else:
+                    # Generic folder creation
+                    return {"operation": "create_folder", "folder_name": "new_folder", "folder_path": ""}
+        
         return {"operation": "chat"}
     
     def resolve_path(self, path_str: str) -> Path:
@@ -126,12 +147,8 @@ Respond with JSON only:
         
         # Handle special user folder names
         if path_str in self.safe_user_dirs:
-            if self.system == 'windows':
-                user_home = Path.home()
-                return user_home / path_str
-            else:
-                user_home = Path.home()
-                return user_home / path_str
+            user_home = Path.home()
+            return user_home / path_str
         
         # Handle Windows paths
         if self.system == 'windows':
@@ -141,6 +158,11 @@ Respond with JSON only:
             # Handle UNC paths like \\server\share
             elif path_str.startswith('\\\\'):
                 return Path(path_str)
+            # Handle paths with placeholders like C:\Users\your_username\Desktop
+            elif 'your_username' in path_str:
+                # Replace placeholder with actual username
+                actual_path = path_str.replace('your_username', Path.home().name)
+                return Path(actual_path)
             # Handle relative paths
             else:
                 return self.base_dir / path_str
@@ -190,6 +212,12 @@ Respond with JSON only:
             target_path = self.resolve_path(folder_path)
             final_path = target_path / folder_name
             
+            # Debug info
+            print(f"DEBUG: folder_path='{folder_path}' -> target_path='{target_path}'")
+            print(f"DEBUG: final_path='{final_path}'")
+            print(f"DEBUG: final_path.exists()={final_path.exists()}")
+            print(f"DEBUG: Path.home()='{Path.home()}'")
+            
             # Check if the path is safe
             is_safe, safety_message = self.is_path_safe(final_path)
             if not is_safe:
@@ -207,8 +235,8 @@ Respond with JSON only:
             
             return True, f"✅ Folder '{folder_name}' created successfully at: {final_path}"
             
-        except PermissionError:
-            return False, f"Permission denied: Cannot create folder '{folder_name}' at {target_path}"
+        except PermissionError as e:
+            return False, f"Permission denied: Cannot create folder '{folder_name}' at {target_path}. Error: {e}"
         except Exception as e:
             return False, f"Error creating folder '{folder_name}': {e}"
     

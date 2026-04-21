@@ -1,7 +1,7 @@
-<<<<<<< HEAD
+HEAD
 # industrial-attachment
 industrial-attachment-work
-=======
+
 # AI Folder Chatbot
 
 An intelligent chatbot powered by Qwen (via Ollama) that can create folders through natural language conversation.
@@ -81,4 +81,4 @@ The chatbot understands various ways to ask for folder creation:
 - Ollama running on localhost:11434
 - Qwen 1.5B model installed
 - requests library
->>>>>>> 120b94a (initialized commit)
+120b94a (initialized commit)
